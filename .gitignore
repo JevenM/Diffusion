@@ -1,0 +1,11 @@
+/Adv_Adap
+/Brain-Tumor-Classification-DataSet-master
+/data
+/data.zip
+/master.zip
+/models
+/results
+*.png
+*.mp4
+*.pth
+/runs
