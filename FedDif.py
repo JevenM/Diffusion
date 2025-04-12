@@ -35,8 +35,8 @@ torch.backends.cudnn.benchmark = True  # 加速固定输入
 torch.backends.cudnn.deterministic = True  # 确定性算法
 # 选择GPU
 device_id = 1
-# 1:iid 0:non-iid 2:direchlet dist
-is_iid = 0
+# TODO 1:iid 0:non-iid 2:direchlet dist
+is_iid = 2
 num_users = 10  # 10
 # data_dir = '/data/mwj/mycode1/FGL_FrameWork/data' #'Mnist' #'SVHN' #'Cifar10' #'stl10'
 # data_dir = './data'
@@ -47,11 +47,15 @@ inChannel = 3
 verbose = True
 local_train_bs = 256
 test_bs = 256
-# fedavg or fedatt?
-use_avg = False
+# TODO fedavg or fedatt?
+use_avg = True
 # R: 300
 num_rounds = 300
+# TODO
 num_classes = 4  # 10
+num_of_per_class = 10
+total_num = num_classes * num_of_per_class
+
 # E
 local_epoch = 10
 frac_users = 1  # 1 0.4 0.7 1.0
@@ -252,7 +256,7 @@ class Diffusion(nn.Module):
         # The inputs to timestep_embed will approximately fall into the range
         # -10 to 10, so use std 0.2 for the Fourier Features.
         self.timestep_embed = FourierFeatures(1, 16, std=0.2)
-        self.class_embed = nn.Embedding(10, 4)
+        self.class_embed = nn.Embedding(num_classes, 4)
 
         self.net = nn.Sequential(  # 32x32
             ResConvBlock(in_channel + 16 + 4, c, c),
@@ -439,8 +443,6 @@ def dataset_iid(dataset, num_users):
     :return: dict of image index
     """
     num_items = int(len(dataset) / num_users)
-    # 100: args.shots
-    # num_items = 100
     dict_users, all_idxs = {}, [i for i in range(len(dataset))]
     for i in range(num_users):
         dict_users[i] = set(np.random.choice(all_idxs, num_items, replace=False))
@@ -772,7 +774,7 @@ def sample(model, x, steps, eta, classes):
 
 @torch.no_grad()
 @torch.random.fork_rng(devices=[device_id])
-def demo(model, c_id, gen_img_num=100, g_name="None", in_channel=3):
+def demo(model, c_id=None, gen_img_num=total_num, g_name="None", in_channel=3):
     eval_mode(model)
     torch.manual_seed(seed)
     # print(f"in_channel: {in_channel}")
@@ -885,7 +887,12 @@ class LocalUpdate(object):
             if (iter + 1) % self.local_epochs == 0:
                 val_ls = self.val()
                 log.info(f"Validation: local epoch: {iter}, loss: {val_ls:g}")
-                demo(self.model_ema, self.id, in_channel=inChannel)
+                demo(
+                    self.model_ema,
+                    self.id,
+                    gen_img_num=num_classes * 10,
+                    in_channel=inChannel,
+                )
             self.save()
             # 要不要加？
             # del images,labels,batch_idx
@@ -1258,8 +1265,20 @@ with trange(num_rounds, colour="red", desc="Round") as t:
         g_m_ls = test_global(global_model, test_loader, round)
         g_emam_ls = test_global(global_model_ema, test_loader, round)
         # get global sample images, 评估时应该看中ema模型的性能
-        demo(global_model, c_id=None, g_name="global", in_channel=inChannel)
-        demo(global_model_ema, c_id=None, g_name="global_ema", in_channel=inChannel)
+        demo(
+            global_model,
+            c_id=None,
+            gen_img_num=total_num,
+            g_name="global",
+            in_channel=inChannel,
+        )
+        demo(
+            global_model_ema,
+            c_id=None,
+            gen_img_num=total_num,
+            g_name="global_ema",
+            in_channel=inChannel,
+        )
         global_list_ls.append(g_m_ls)
         global_ema_list_ls.append(g_emam_ls)
         summary_writer.add_scalar("Test-Loss/global", g_m_ls, round + 1)
