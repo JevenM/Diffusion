@@ -15,3 +15,10 @@
 
 ### 2 联邦域适应
 
+
+adv_adaption.py是利用gan进行对抗学习，PPT在E:\Doctor1\Latex\FedAdvDA\PPt.pptx
+![alt text](image-1.png)
+
+adv_adaption_cgan.py是条件gan加入label信息
+
+不过都是在单个节点运行的，至于联邦的版本，在G2G中
